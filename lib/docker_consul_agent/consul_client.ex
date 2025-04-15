@@ -20,7 +20,7 @@ defmodule DockerConsulAgent.ConsulClient do
   """
   def new() do
     consul_opts =
-      Application.get_env(:docker_consul_agent, DockerConsulAgent.ConsulClient) |> Map.new()
+      Application.get_env(:docker_consul_agent, __MODULE__) |> Map.new()
 
     Req.new(
       base_url: consul_opts.base_url,
@@ -30,7 +30,16 @@ defmodule DockerConsulAgent.ConsulClient do
   end
 
   @doc """
-  Deregisters a node from the Consul catalog.
+  Registers an entity with the Consul catalog.
+  This is a wrapper around the Consul API endpoint
+  `/v1/catalog/register`.
+  """
+  def register!(%{} = service) do
+    new() |> put!("/v1/catalog/register", service)
+  end
+
+  @doc """
+  Deregisters an entity from the Consul catalog.
   This is a wrapper around the Consul API endpoint
   `/v1/catalog/deregister`.
   """
@@ -43,16 +52,27 @@ defmodule DockerConsulAgent.ConsulClient do
   end
 
   @doc """
-  Registers a service with the Consul catalog.
+  Registers a service with the Consul agent.
+
   This is a wrapper around the Consul API endpoint
-  `/v1/catalog/register`.
+  `/v1/agent/service/register`.
   """
-  def register!(service) do
-    new() |> put!("/v1/catalog/register", service)
+  def register_agent_service!(%{} = service) do
+    new() |> put!("/v1/agent/service/register", service)
   end
 
-  def get!(path) do
-    new() |> get!(path)
+  @doc """
+  Deregisters a service from the Consul agent.
+
+  This is a wrapper around the Consul API endpoint.
+  `/v1/agent/service/deregister/:service_id`.
+  """
+  def deregister_agent_service!(service_id) when is_binary(service_id) do
+    new() |> req(:put, "/v1/agent/service/deregister/#{service_id}")
+  end
+
+  def deregister_agent_service!(%{ID: service_id}) do
+    deregister_agent_service!(service_id)
   end
 
   def get!(%Req.Request{} = req, path) do
@@ -82,5 +102,27 @@ defmodule DockerConsulAgent.ConsulClient do
         Logger.error("Error: #{inspect(reason)}")
         raise "Request failed with error: #{inspect(reason)}"
     end
+  end
+
+  # -------------------------------------------------------------------------- #
+  # The below functions are lower-level Req wrappers. They are for advanced uses.
+  # -------------------------------------------------------------------------- #
+
+  @doc """
+  Makes a request to the Consul API using the specified HTTP method and path.
+  This is a raw request and does not use the response handler. It is up to the
+  end-user to handle the HTTP response.
+  """
+  def req(client, method, path, opts \\ [])
+  def req(%Req.Request{} = client, :get, path, opts), do: do_req(client, :get, path, opts)
+  def req(%Req.Request{} = client, :put, path, opts), do: do_req(client, :put, path, opts)
+  def req(%Req.Request{} = client, :post, path, opts), do: do_req(client, :post, path, opts)
+
+  def req(_client, method, _path, _opts) do
+    raise ArgumentError, "Unsupported method: #{inspect(method)}"
+  end
+
+  defp do_req(client, method, path, opts) do
+    Req.request(client, [method: method, url: path] ++ opts)
   end
 end

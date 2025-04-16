@@ -45,10 +45,25 @@ defmodule DockerConsulAgent.DockerClient do
     |> handle_response()
   end
 
+  def get_current_consul_containers() do
+    new()
+    |> Req.get(
+      url: "/containers/json",
+      params: [filters: Jason.encode!(%{"label" => ["consul.enabled=true"]})]
+    )
+    |> handle_response()
+  end
+
   def handle_response({:ok, %Req.Response{body: body}}) do
     case body do
       %{} = body ->
         body
+
+      [_ | _] = body ->
+        body
+
+      [] ->
+        []
 
       err ->
         raise "Failed to decode JSON response: #{inspect(err)}"

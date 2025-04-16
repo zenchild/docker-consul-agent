@@ -3,6 +3,7 @@ defmodule DockerConsulAgent do
 
   require Logger
 
+  alias DockerConsulAgent.Reconciler
   alias DockerConsulAgent.ConsulClient
   alias DockerConsulAgent.DockerClient
   alias DockerConsulAgent.ServiceFormatter
@@ -14,6 +15,9 @@ defmodule DockerConsulAgent do
   @impl true
   def init(:ok) do
     Logger.debug("#{inspect(node())}: init(:ok)")
+    Logger.debug("Running Reconciler...")
+    Reconciler.run()
+    Logger.debug("Running Reconciler... done")
     {:ok, {:socket, connect_to_docker_socket()}}
   end
 

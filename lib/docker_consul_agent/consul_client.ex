@@ -75,6 +75,15 @@ defmodule DockerConsulAgent.ConsulClient do
     deregister_agent_service!(service_id)
   end
 
+  def get_current_docker_nodes() do
+    new()
+    |> Req.get(
+      url: "/v1/catalog/nodes",
+      params: [filter: ~s(Meta["docker-consul-agent"] == true)]
+    )
+    |> handle_response()
+  end
+
   def get!(%Req.Request{} = req, path) do
     Req.get(req, url: path)
     |> handle_response()
@@ -91,6 +100,15 @@ defmodule DockerConsulAgent.ConsulClient do
 
   defp handle_response({_, %Req.Response{}} = resp) do
     case resp do
+      {:ok, %Req.Response{status: 200, body: %{} = body}} ->
+        body
+
+      {:ok, %Req.Response{status: 200, body: [_ | _] = body}} ->
+        body
+
+      {:ok, %Req.Response{status: 200, body: [] = body}} ->
+        body
+
       {:ok, %Req.Response{status: 200}} ->
         :ok
 

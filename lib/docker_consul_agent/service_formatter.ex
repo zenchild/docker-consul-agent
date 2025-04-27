@@ -13,15 +13,17 @@ defmodule DockerConsulAgent.ServiceFormatter do
 
     node_name = Map.get(labels, "consul.node_name", docker_json["Config"]["Hostname"])
 
+    ip_addr = net_conf["IPAddress"]
+
     node_def =
       %{
         Node: node_name,
-        Address: net_conf["IPAddress"],
+        Address: ip_addr,
         TaggedAddresses: %{
-          lan: net_conf["IPAddress"],
-          lan_ipv4: net_conf["IPAddress"],
-          wan: net_conf["IPAddress"],
-          wan_ipv4: net_conf["IPAddress"]
+          lan: ip_addr,
+          lan_ipv4: ip_addr,
+          wan: ip_addr,
+          wan_ipv4: ip_addr
         },
         SkipNodeUpdate: true,
         NodeMeta: %{
@@ -46,7 +48,7 @@ defmodule DockerConsulAgent.ServiceFormatter do
 
   # This will create [Service](https://developer.hashicorp.com/consul/api-docs/catalog#service)
   # for each service defined in the docker container labels.
-  defp services(node_name, net_conf, labels) do
+  defp services(node_name, _net_conf, labels) do
     service_basename =
       Map.get(labels, "consul.service_basename", "")
       |> String.trim()
@@ -58,12 +60,13 @@ defmodule DockerConsulAgent.ServiceFormatter do
     |> Enum.map(fn {service_name, service_conf} ->
       service_port = Map.get(service_conf, "port", 0)
       service_tags = Map.get(service_conf, "tags", [])
+      service_address = Map.get(service_conf, "address", "")
 
       %{
         ID: node_name <> "-" <> service_basename <> service_name,
         Service: service_basename <> service_name,
         Port: service_port,
-        Address: net_conf["IPAddress"],
+        Address: service_address,
         Tags: service_tags
       }
     end)
@@ -92,6 +95,15 @@ defmodule DockerConsulAgent.ServiceFormatter do
           service_tags = String.split(v, ",") |> Enum.map(&String.trim/1)
 
           Map.put(m, service_name, Map.merge(m[service_name] || %{}, %{"tags" => service_tags}))
+
+        [service_name, "address"] ->
+          service_address = String.trim(v)
+
+          Map.put(
+            m,
+            service_name,
+            Map.merge(m[service_name] || %{}, %{"address" => service_address})
+          )
 
         _unknown_label ->
           m
